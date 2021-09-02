@@ -112,9 +112,11 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	/** Map between containing bean names: bean name to Set of bean names that the bean contains. */
 	private final Map<String, Set<String>> containedBeanMap = new ConcurrentHashMap<>(16);
 
+	//保存的是依赖 beanName 之间的映射关系：beanName - > 依赖 beanName 的集合
 	/** Map between dependent bean names: bean name to Set of dependent bean names. */
 	private final Map<String, Set<String>> dependentBeanMap = new ConcurrentHashMap<>(64);
 
+	//保存的是依赖 beanName 之间的映射关系：依赖 beanName - > beanName 的集合
 	/** Map between depending bean names: bean name to Set of bean names for the bean's dependencies. */
 	private final Map<String, Set<String>> dependenciesForBeanMap = new ConcurrentHashMap<>(64);
 
@@ -183,15 +185,18 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 */
 	@Nullable
 	protected Object getSingleton(String beanName, boolean allowEarlyReference) {
-		//检查缓存中是否存在实例
+		//检查一级缓存，单例缓存池中是否存在实例
 		Object singletonObject = this.singletonObjects.get(beanName);
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
 			//如果为空，则锁定全局变量并进行处理
 			synchronized (this.singletonObjects) {
+				//尝试去二级缓存(earlySingletonObjects)中获取对象(二级缓存中的对象是一个早期对象)
+				//什么是早期对象:就是bean刚刚调用了构造方法，还没有给bean的属性进行赋值的对象,就是早期对象
 				//如果此bean正在加载则不处理
 				singletonObject = this.earlySingletonObjects.get(beanName);
 				if (singletonObject == null && allowEarlyReference) {
-					// 当某些方法 捉前初始化的时 会调 addSi le ton Factory 方法将对应的ObjectFatory初始化策略存储在singletonFactories
+					//直接从三级缓存中获取 ObjectFactory对象
+					// 当某些方法 捉前初始化的时 会调 addSiletonFactory 方法将对应的ObjectFatory初始化策略存储在singletonFactories
 					ObjectFactory<?> singletonFactory = this.singletonFactories.get(beanName);
 					if (singletonFactory != null) {
 						//调用预告设定的getObject方法
@@ -227,6 +232,8 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 				if (logger.isDebugEnabled()) {
 					logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
 				}
+				//将beanName添加到singletonsCurrentlyInCreation
+				//为isSingletonCurrentlyInCreation判断
 				beforeSingletonCreation(beanName);
 				boolean newSingleton = false;
 				boolean recordSuppressedExceptions = (this.suppressedExceptions == null);
@@ -257,6 +264,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					if (recordSuppressedExceptions) {
 						this.suppressedExceptions = null;
 					}
+					//将beanName从singletonsCurrentlyInCreation移除
 					afterSingletonCreation(beanName);
 				}
 				if (newSingleton) {
@@ -414,9 +422,11 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * @param dependentBeanName the name of the dependent bean
 	 */
 	public void registerDependentBean(String beanName, String dependentBeanName) {
+		//获取原始的beanName
 		String canonicalName = canonicalName(beanName);
 
 		synchronized (this.dependentBeanMap) {
+			//添加 <canonicalName, <dependentBeanName>> 到 dependentBeanMap 中
 			Set<String> dependentBeans =
 					this.dependentBeanMap.computeIfAbsent(canonicalName, k -> new LinkedHashSet<>(8));
 			if (!dependentBeans.add(dependentBeanName)) {
@@ -425,6 +435,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		}
 
 		synchronized (this.dependenciesForBeanMap) {
+			// 添加 <dependentBeanName, <canonicalName>> 到 dependenciesForBeanMap 中
 			Set<String> dependenciesForBean =
 					this.dependenciesForBeanMap.computeIfAbsent(dependentBeanName, k -> new LinkedHashSet<>(8));
 			dependenciesForBean.add(canonicalName);
