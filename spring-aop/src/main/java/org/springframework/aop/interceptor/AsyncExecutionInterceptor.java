@@ -110,6 +110,7 @@ public class AsyncExecutionInterceptor extends AsyncExecutionAspectSupport imple
 					"No executor specified and no default executor set on AsyncExecutionInterceptor either");
 		}
 
+		//构造 一个 task，里面是执行方法接口的逻辑
 		Callable<Object> task = () -> {
 			try {
 				Object result = invocation.proceed();
@@ -126,6 +127,7 @@ public class AsyncExecutionInterceptor extends AsyncExecutionAspectSupport imple
 			return null;
 		};
 
+		//主要执行点
 		return doSubmit(task, executor, invocation.getMethod().getReturnType());
 	}
 

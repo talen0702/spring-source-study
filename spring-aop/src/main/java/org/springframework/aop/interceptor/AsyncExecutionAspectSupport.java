@@ -273,6 +273,7 @@ public abstract class AsyncExecutionAspectSupport implements BeanFactoryAware {
 		if (CompletableFuture.class.isAssignableFrom(returnType)) {
 			return CompletableFuture.supplyAsync(() -> {
 				try {
+					//执行外面构造的task逻辑
 					return task.call();
 				}
 				catch (Throwable ex) {
